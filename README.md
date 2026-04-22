@@ -1,4 +1,4 @@
-# The Guardian - Crypto Price Tracker
+# NEXUS - Crypto Price Tracker
 
 Простий скрипт на Python для відстеження ціни криптовалюти (ETH/USDT) у реальному часі через публічне API Binance.
 
