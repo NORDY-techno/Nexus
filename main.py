@@ -24,10 +24,10 @@ while True:
             change = ((current_price - last_price) / last_price) * 100
             
             # Визначаємо колір та знак залежно від зміни ціни
-            if change > 0:
+            if change >= 0.1:
                 color = GREEN
                 sign = "+"
-            elif change < 0:
+            elif change <= -0.1:
                 color = RED
                 sign = ""
             else:
