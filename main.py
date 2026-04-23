@@ -1,5 +1,10 @@
 import requests  # Імпортуємо бібліотеку для роботи з інтернет-запитами
+import time      # Для коротких пауз при помилках
 from utils import animate_wait  # Імпортуємо нашу функцію анімації
+from logger import setup_logger # Імпортуємо налаштування логера
+
+# Ініціалізуємо логер
+logger = setup_logger()
 
 # Коди кольорів для консолі (ANSI escape codes)
 GREEN = "\033[92m"   # Зелений колір
@@ -9,33 +14,48 @@ RESET = "\033[0m"    # Скидання кольору до звичайного
 # Змінна для збереження попередньої ціни
 last_price = None
 
+logger.info("Nexus запущено. Починаємо відстеження ціни ETH/USDT.")
+
 # Створюємо нескінченний цикл
 while True:
     try:
         # Запит до Binance
-        response = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT")
-        current_price = float(response.json()['price'])
+        response = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT", timeout=10)
         
-        if last_price is not None:
-            # Розрахунок зміни
-            change = ((current_price - last_price) / last_price) * 100
+        # Перевіряємо, чи успішний запит (код 200)
+        if response.status_code == 200:
+            current_price = float(response.json()['price'])
             
-            # Визначаємо колір
-            if change >= 0.1:
-                color, sign = GREEN, "+"
-            elif change <= -0.1:
-                color, sign = RED, ""
-            else:
-                color, sign = RESET, ""
+            if last_price is not None:
+                # Розрахунок зміни
+                change = ((current_price - last_price) / last_price) * 100
+                
+                # Визначаємо колір для консолі
+                if change >= 0.1:
+                    color, sign = GREEN, "+"
+                elif change <= -0.1:
+                    color, sign = RED, ""
+                else:
+                    color, sign = RESET, ""
+                
+                # Формуємо повідомлення
+                msg = f"Ціна: {current_price} USDT | Зміна: {sign}{change:.2f}%"
+                
+                # Записуємо в лог
+                logger.info(msg)
             
-            # Виводимо результат
-            print(f"{color}Ціна: {current_price} USDT | Зміна: {sign}{change:.2f}%{RESET}")
-        
-        # Оновлюємо попередню ціну
-        last_price = current_price
-        
+            # Оновлюємо попередню ціну
+            last_price = current_price
+            
+            # Якщо все пройшло успішно, чекаємо 30 секунд до наступного планового запиту
+            animate_wait(30)
+            
+        else:
+            logger.error(f"Біржа відповіла помилкою {response.status_code}. Спробуємо знову через 5 секунд...")
+            time.sleep(5)
+            continue
+            
     except Exception as e:
-        print(f"Виникла помилка: {e}")
-    
-    # Викликаємо анімоване очікування на 30 секунд з utils.py
-    animate_wait(30)
+        logger.error(f"Помилка зв'язку: {e}. Повторна спроба через 5 секунд...")
+        time.sleep(5)
+        continue
