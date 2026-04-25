@@ -18,7 +18,7 @@ GRANULARITY = "5m"
 # Змінна для збереження попередньої ціни
 last_price = None
 
-logger.info(f"Nexus запущено. Моніторинг {SYMBOL} (Bitget) + RSI(14) M5.")
+logger.info(f"Nexus запущено. Моніторинг {SYMBOL} (Bitget)")
 
 while True:
     # Отримуємо дані через окремий модуль API
