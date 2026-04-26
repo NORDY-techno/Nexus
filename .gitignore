@@ -1,0 +1,19 @@
+# Секретні файли
+.env
+
+# Логи
+*.log
+
+# Python кеш
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Віртуальне середовище
+venv/
+.venv/
+env/
+
+# Системні файли
+.DS_Store
+Thumbs.db

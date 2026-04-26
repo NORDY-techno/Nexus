@@ -1,19 +1,24 @@
 import requests
 import logging
+import os
+from dotenv import load_dotenv
+
+# Завантажуємо змінні з .env файлу
+load_dotenv()
 
 # Отримуємо логер
 logger = logging.getLogger("Nexus")
 
-# Конфігурація Telegram (Сюди потрібно вставити твої дані)
-TOKEN = "YOUR_BOT_TOKEN"
-CHAT_ID = "YOUR_CHAT_ID"
+# Конфігурація Telegram (Беремо дані з .env)
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 def send_telegram_msg(message):
     """
     Відправляє повідомлення у Telegram бот.
     """
-    if TOKEN == "YOUR_BOT_TOKEN" or CHAT_ID == "YOUR_CHAT_ID":
-        # Якщо дані не заповнені, просто нічого не робимо (щоб не було помилок)
+    if not TOKEN or not CHAT_ID or TOKEN == "YOUR_BOT_TOKEN":
+        # Якщо дані не заповнені, просто нічого не робимо
         return False
         
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
