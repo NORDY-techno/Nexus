@@ -18,7 +18,6 @@ def send_telegram_msg(message):
     Відправляє повідомлення у Telegram бот.
     """
     if not TOKEN or not CHAT_ID or TOKEN == "YOUR_BOT_TOKEN":
-        # Якщо дані не заповнені, просто нічого не робимо
         return False
         
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -31,9 +30,12 @@ def send_telegram_msg(message):
     try:
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
+            # Додаємо логування успішної відправки (тільки у файл, щоб не спамити в консоль)
+            with open("nexus.log", "a", encoding="utf-8") as f:
+                f.write(f"{logging.Formatter().formatTime(logging.LogRecord('Nexus', logging.INFO, '', 0, '', None, None))} [DEBUG] Telegram message sent\n")
             return True
         else:
-            logger.error(f"Telegram Error: {response.status_code}")
+            logger.error(f"Telegram Error: {response.status_code} - {response.text}")
             return False
     except Exception as e:
         logger.error(f"Telegram Exception: {e}")

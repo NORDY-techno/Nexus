@@ -13,8 +13,12 @@ GREEN = "\033[92m"
 RED = "\033[91m"
 RESET = "\033[0m"
 
+# Налаштування
 SYMBOL = "ETHUSDT"
 GRANULARITY = "5m"
+COLOR_THRESHOLD = 0.1    # Поріг для зміни кольору в терміналі
+TG_THRESHOLD = 0.01      # Поріг для відправки в Telegram (знизив, щоб повідомлення приходили частіше)
+
 last_price = None
 
 logger.info(f"Nexus Active | {SYMBOL} | M5")
@@ -29,15 +33,15 @@ while True:
         if last_price is not None:
             change = ((price - last_price) / last_price) * 100
             
-            # Визначаємо колір та емодзі для Telegram
-            if change >= 0.1: 
+            # Визначаємо колір для термінала
+            if change >= COLOR_THRESHOLD: 
                 color, sign, emoji = GREEN, "+", "🟢"
-            elif change <= -0.1: 
+            elif change <= -COLOR_THRESHOLD: 
                 color, sign, emoji = RED, "", "🔴"
             else: 
                 color, sign, emoji = "", "", "⚪"
             
-            # Повідомлення
+            # Повідомлення для логів та консолі
             clean_msg = f"{price} USDT | {sign}{change:.2f}%{rsi_text}"
             
             # 1. Вивід у консоль
@@ -47,8 +51,8 @@ while True:
             with open("nexus.log", "a", encoding="utf-8") as f:
                 f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} [INFO] {clean_msg}\n")
             
-            # 3. Відправка в Telegram (тільки якщо зміна суттєва > 0.1%)
-            if abs(change) >= 0.1:
+            # 3. Відправка в Telegram (тільки якщо зміна суттєва для TG)
+            if abs(change) >= TG_THRESHOLD:
                 tg_msg = f"{emoji} <b>{SYMBOL}</b>\nPrice: {price} USDT\nChange: {sign}{change:.2f}%\nRSI: {rsi:.1f if rsi else 'N/A'}"
                 send_telegram_msg(tg_msg)
         
