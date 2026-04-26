@@ -14,7 +14,7 @@ RED = "\033[91m"
 RESET = "\033[0m"
 
 # Налаштування
-SYMBOL = "ETHUSDT"
+SYMBOL = "KITEUSDT"
 GRANULARITY = "5m"
 COLOR_THRESHOLD = 0.1    # Поріг для зміни кольору в терміналі
 TG_THRESHOLD = 0.01      # Поріг для відправки в Telegram (знизив, щоб повідомлення приходили частіше)
@@ -53,7 +53,8 @@ while True:
             
             # 3. Відправка в Telegram (тільки якщо зміна суттєва для TG)
             if abs(change) >= TG_THRESHOLD:
-                tg_msg = f"{emoji} <b>{SYMBOL}</b>\nPrice: {price} USDT\nChange: {sign}{change:.2f}%\nRSI: {rsi:.1f if rsi else 'N/A'}"
+                rsi_val_str = f"{rsi:.1f}" if rsi is not None else "N/A"
+                tg_msg = f"{emoji} <b>{SYMBOL}</b>\nPrice: {price} USDT\nChange: {sign}{change:.2f}%\nRSI: {rsi_val_str}"
                 send_telegram_msg(tg_msg)
         
         last_price = price
