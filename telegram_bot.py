@@ -1,6 +1,7 @@
-import requests
+import aiohttp
 import logging
 import os
+import time
 from dotenv import load_dotenv
 
 # Завантажуємо змінні з .env файлу
@@ -13,9 +14,9 @@ logger = logging.getLogger("Nexus")
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-def send_telegram_msg(message):
+async def send_telegram_msg(session, message):
     """
-    Відправляє повідомлення у Telegram бот.
+    Асинхронно відправляє повідомлення у Telegram бот.
     """
     if not TOKEN or not CHAT_ID or TOKEN == "YOUR_BOT_TOKEN":
         return False
@@ -28,15 +29,17 @@ def send_telegram_msg(message):
     }
     
     try:
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code == 200:
-            # Додаємо логування успішної відправки (тільки у файл, щоб не спамити в консоль)
-            with open("nexus.log", "a", encoding="utf-8") as f:
-                f.write(f"{logging.Formatter().formatTime(logging.LogRecord('Nexus', logging.INFO, '', 0, '', None, None))} [DEBUG] Telegram message sent\n")
-            return True
-        else:
-            logger.error(f"Telegram Error: {response.status_code} - {response.text}")
-            return False
+        async with session.post(url, json=payload, timeout=10) as response:
+            if response.status == 200:
+                # Додаємо логування успішної відправки (тільки у файл)
+                with open("nexus.log", "a", encoding="utf-8") as f:
+                    timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+                    f.write(f"{timestamp} [DEBUG] Telegram message sent\n")
+                return True
+            else:
+                resp_text = await response.text()
+                logger.error(f"Telegram Error: {response.status} - {resp_text}")
+                return False
     except Exception as e:
         logger.error(f"Telegram Exception: {e}")
         return False

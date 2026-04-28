@@ -1,32 +1,42 @@
 import time
 import sys
+import asyncio
 
 def animate_wait(seconds):
     """
-    Функція для анімованого очікування.
-    Вона показує символ, що обертається, поки програма чекає.
+    Функція для анімованого очікування (синхронна).
     """
     symbols = ["|", "/", "-", "\\"]
-    
-    # Робимо кроки по 0.1 секунди, щоб анімація була плавною
     iterations = int(seconds / 0.1)
     
     for i in range(iterations):
         symbol = symbols[i % 4]
-        # \r повертає курсор на початок рядка
-        # end="" дозволяє не переходити на новий рядок
         sys.stdout.write(f"\rОчікування... [{symbol}]")
         sys.stdout.flush()
         time.sleep(0.1)
     
-    # Очищаємо рядок після завершення очікування
+    sys.stdout.write("\r" + " " * 25 + "\r")
+    sys.stdout.flush()
+
+async def async_animate_wait(seconds):
+    """
+    Асинхронна функція для анімованого очікування.
+    """
+    symbols = ["|", "/", "-", "\\"]
+    iterations = int(seconds / 0.1)
+    
+    for i in range(iterations):
+        symbol = symbols[i % 4]
+        sys.stdout.write(f"\rОчікування... [{symbol}]")
+        sys.stdout.flush()
+        await asyncio.sleep(0.1)
+    
     sys.stdout.write("\r" + " " * 25 + "\r")
     sys.stdout.flush()
 
 def calculate_rsi(prices, period=14):
     """
     Розрахунок індикатора RSI (Relative Strength Index).
-    Приймає список цін закриття.
     """
     if len(prices) < period + 1:
         return None
@@ -34,7 +44,6 @@ def calculate_rsi(prices, period=14):
     gains = []
     losses = []
     
-    # Рахуємо різницю між сусідніми цінами
     for i in range(1, len(prices)):
         diff = prices[i] - prices[i-1]
         if diff > 0:
@@ -44,11 +53,9 @@ def calculate_rsi(prices, period=14):
             gains.append(0)
             losses.append(abs(diff))
             
-    # Перше середнє значення (просте середнє)
     avg_gain = sum(gains[:period]) / period
     avg_loss = sum(losses[:period]) / period
     
-    # Наступні значення за методом згладжування Уайлдера
     for i in range(period, len(gains)):
         avg_gain = (avg_gain * (period - 1) + gains[i]) / period
         avg_loss = (avg_loss * (period - 1) + losses[i]) / period

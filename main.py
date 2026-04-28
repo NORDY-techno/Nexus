@@ -1,8 +1,10 @@
-import time
+import asyncio
+import aiohttp
 import sys
+import time
 from bitget_api import get_bitget_data
 from logger import setup_logger
-from utils import animate_wait
+from utils import async_animate_wait
 from telegram_bot import send_telegram_msg
 
 # Ініціалізація логера
@@ -25,49 +27,69 @@ TG_THRESHOLD = 0.01      # Поріг для відправки в Telegram
 # Словник для збереження останніх цін кожного активу
 last_prices = {}
 
-logger.info(f"Nexus Active | Monitoring {len(SYMBOLS)} assets | M5")
-send_telegram_msg(f"🚀 <b>Nexus Multi-Active</b>\nAssets: {', '.join(SYMBOLS)}\nTimeframe: {GRANULARITY}")
-
-while True:
-    for symbol in SYMBOLS:
-        price, rsi = get_bitget_data(symbol, GRANULARITY)
+async def process_symbol(session, symbol):
+    """
+    Обробка одного активу: запит даних, розрахунок зміни та відправка сповіщень.
+    """
+    global last_prices
+    price, rsi = await get_bitget_data(session, symbol, GRANULARITY)
+    
+    if price is not None:
+        rsi_text = f" | RSI: {rsi:.1f}" if rsi is not None else ""
         
-        if price is not None:
-            rsi_text = f" | RSI: {rsi:.1f}" if rsi is not None else ""
+        if symbol in last_prices and last_prices[symbol] is not None:
+            old_price = last_prices[symbol]
+            change = ((price - old_price) / old_price) * 100
             
-            # Перевіряємо, чи є попередня ціна для цього активу
-            if symbol in last_prices and last_prices[symbol] is not None:
-                old_price = last_prices[symbol]
-                change = ((price - old_price) / old_price) * 100
-                
-                # Визначаємо колір та емодзі
-                if change >= COLOR_THRESHOLD: 
-                    color, sign, emoji = GREEN, "+", "🟢"
-                elif change <= -COLOR_THRESHOLD: 
-                    color, sign, emoji = RED, "", "🔴"
-                else: 
-                    color, sign, emoji = "", "", "⚪"
-                
-                # Повідомлення
-                clean_msg = f"{symbol}: {price} USDT | {sign}{change:.2f}%{rsi_text}"
-                
-                # 1. Вивід у консоль
-                sys.stdout.write(f"[{time.strftime('%H:%M:%S')}] {color}{clean_msg}{RESET}\n")
-                
-                # 2. Запис у лог-файл
-                with open("nexus.log", "a", encoding="utf-8") as f:
-                    f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} [INFO] {clean_msg}\n")
-                
-                # 3. Відправка в Telegram (тільки якщо зміна суттєва)
-                if abs(change) >= TG_THRESHOLD:
-                    rsi_val_str = f"{rsi:.1f}" if rsi is not None else "N/A"
-                    tg_msg = f"{emoji} <b>{symbol}</b>\nPrice: {price} USDT\nChange: {sign}{change:.2f}%\nRSI: {rsi_val_str}"
-                    send_telegram_msg(tg_msg)
+            if change >= COLOR_THRESHOLD: 
+                color, sign, emoji = GREEN, "+", "🟢"
+            elif change <= -COLOR_THRESHOLD: 
+                color, sign, emoji = RED, "", "🔴"
+            else: 
+                color, sign, emoji = "", "", "⚪"
             
-            # Оновлюємо останню ціну для активу
-            last_prices[symbol] = price
-        else:
-            logger.error(f"API Error for {symbol} | Skipping...")
+            clean_msg = f"{symbol}: {price} USDT | {sign}{change:.2f}%{rsi_text}"
             
-    # Пауза після того, як перевірили всі активи
-    animate_wait(30)
+            # Вивід у консоль
+            sys.stdout.write(f"[{time.strftime('%H:%M:%S')}] {color}{clean_msg}{RESET}\n")
+            
+            # Запис у лог-файл
+            with open("nexus.log", "a", encoding="utf-8") as f:
+                f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} [INFO] {clean_msg}\n")
+            
+            # Відправка в Telegram
+            if abs(change) >= TG_THRESHOLD:
+                rsi_val_str = f"{rsi:.1f}" if rsi is not None else "N/A"
+                tg_msg = f"{emoji} <b>{symbol}</b>\nPrice: {price} USDT\nChange: {sign}{change:.2f}%\nRSI: {rsi_val_str}"
+                await send_telegram_msg(session, tg_msg)
+        
+        last_prices[symbol] = price
+    else:
+        logger.error(f"API Error for {symbol} | Skipping...")
+
+async def main():
+    logger.info(f"Nexus Active | Monitoring {len(SYMBOLS)} assets (ASYNC) | M5")
+    
+    async with aiohttp.ClientSession() as session:
+        # Початкове повідомлення в Telegram
+        await send_telegram_msg(session, f"🚀 <b>Nexus Async Active</b>\nAssets: {', '.join(SYMBOLS)}\nTimeframe: {GRANULARITY}")
+        
+        while True:
+            # Створюємо список завдань для всіх активів
+            tasks = [process_symbol(session, symbol) for symbol in SYMBOLS]
+            
+            # Запускаємо всі завдання одночасно
+            await asyncio.gather(*tasks)
+            
+            # Анімована пауза
+            await async_animate_wait(30)
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Nexus stopped by user")
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"Unhandled Exception: {e}")
+        sys.exit(1)
