@@ -14,6 +14,7 @@ venv/
 .venv/
 env/
 
-# Системні файли
+# Trae IDE rules
+.traerules
 .DS_Store
 Thumbs.db
