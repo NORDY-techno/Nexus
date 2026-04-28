@@ -7,53 +7,44 @@ logger = logging.getLogger("Nexus")
 
 async def get_bitget_data(session, symbol, granularity="5m"):
     """
-    Асинхронно отримує поточну ціну та розраховує RSI через API Bitget.
-    Повертає кортеж (price, rsi_val).
+    Отримує дані з Bitget: поточну ціну та RSI.
+    Використовує лише один запит до свічок для максимальної точності та швидкості.
     """
     try:
-        # 1. Отримуємо поточну ціну
-        ticker_url = f"https://api.bitget.com/api/v2/spot/market/tickers?symbol={symbol}"
-        async with session.get(ticker_url, timeout=10) as response:
-            if response.status != 200:
-                logger.error(f"Помилка Ticker API ({symbol}): статус {response.status}")
-                return None, None
-            
-            ticker_data = await response.json()
-            if 'data' not in ticker_data or not ticker_data['data']:
-                logger.error(f"Ticker API ({symbol}) повернув порожні дані")
-                return None, None
-            
-            current_price = float(ticker_data['data'][0]['lastPr'])
-
-        # 2. Отримуємо дані для RSI
+        # Granularity для Bitget API v2: 1min, 5min, 15min, 30min, 1h, 4h, 1day тощо.
         bitget_granularity = "5min" if granularity == "5m" else granularity
-        candles_url = f"https://api.bitget.com/api/v2/spot/market/candles?symbol={symbol}&granularity={bitget_granularity}&limit=100"
+        
+        # Запитуємо 200 свічок. Чим більше свічок, тим точніший RSI за методом Вайлдера.
+        # 200 достатньо для ідеальної стабілізації RSI(14).
+        candles_url = f"https://api.bitget.com/api/v2/spot/market/candles?symbol={symbol}&granularity={bitget_granularity}&limit=200"
         
         async with session.get(candles_url, timeout=10) as response:
-            rsi_val = None
-            if response.status == 200:
-                candles_data = await response.json()
-                if 'data' in candles_data and candles_data['data']:
-                    candles = candles_data['data']
-                    # У Bitget API v2 свічки повертаються як масив масивів:
-                    # [ts, open, high, low, close, vol, quoteVol]
-                    # Закриття — це індекс 4. Свічки йдуть від нових до старих.
-                    close_prices = [float(c[4]) for c in candles]
-                    
-                    # Розвертаємо, щоб було від старих до нових
-                    close_prices.reverse()
-                    
-                    # ВАЖЛИВО: Останній елемент у candles[0] — це вже поточна ціна 
-                    # (свічка, що ще формується). Додатково append(current_price) робити НЕ треба,
-                    # бо це призведе до дублювання останньої точки і некоректного RSI.
-                    
-                    rsi_val = calculate_rsi(close_prices, period=14)
-                else:
-                    logger.warning(f"Candles API повернув порожні дані для {symbol}")
-            else:
+            if response.status != 200:
                 logger.error(f"Помилка Candles API ({symbol}): статус {response.status}")
+                return None, None
             
-        return current_price, rsi_val
+            candles_data = await response.json()
+            if 'data' not in candles_data or not candles_data['data']:
+                logger.warning(f"Candles API повернув порожні дані для {symbol}")
+                return None, None
+            
+            candles = candles_data['data']
+            
+            # У Bitget API v2: candles[0] — це найсвіжіша свічка (поточна ціна).
+            # Формат: [ts, open, high, low, close, vol, quoteVol]
+            current_price = float(candles[0][4])
+            
+            # Формуємо список цін закриття для розрахунку RSI
+            close_prices = [float(c[4]) for c in candles]
+            
+            # Свічки йдуть від нових до старих (0 — зараз, 199 — минуле).
+            # Для розрахунку RSI нам потрібен хронологічний порядок (від минулого до теперішнього).
+            close_prices.reverse()
+            
+            # Розраховуємо RSI
+            rsi_val = calculate_rsi(close_prices, period=14)
+            
+            return current_price, rsi_val
         
     except Exception as e:
         logger.error(f"Критична помилка в get_bitget_data ({symbol}): {e}")
