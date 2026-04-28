@@ -49,8 +49,8 @@
    ```
 2. Встановіть залежності:
    ```bash
-   pip install aiohttp python-dotenv
-   ```
+pip install aiohttp python-dotenv tradingview-ta
+```
 
 ## Запуск
 ```bash

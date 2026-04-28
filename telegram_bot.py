@@ -32,9 +32,12 @@ async def send_telegram_msg(session, message):
         async with session.post(url, json=payload, timeout=10) as response:
             if response.status == 200:
                 # Додаємо логування успішної відправки (тільки у файл)
-                with open("nexus.log", "a", encoding="utf-8") as f:
-                    timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-                    f.write(f"{timestamp} [DEBUG] Telegram message sent\n")
+                try:
+                    with open("nexus.log", "a", encoding="utf-8") as f:
+                        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+                        f.write(f"{timestamp} [DEBUG] Telegram message sent\n")
+                except:
+                    pass
                 return True
             else:
                 resp_text = await response.text()
