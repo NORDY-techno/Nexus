@@ -36,26 +36,28 @@ async def async_animate_wait(seconds):
 
 def calculate_rsi(prices, period=14):
     """
-    Розрахунок індикатора RSI (Relative Strength Index).
+    Розрахунок індикатора RSI за методом Вайлдера (як у TradingView).
     """
     if len(prices) < period + 1:
         return None
     
-    gains = []
-    losses = []
-    
+    # 1. Рахуємо різницю (зміни)
+    deltas = []
     for i in range(1, len(prices)):
-        diff = prices[i] - prices[i-1]
-        if diff > 0:
-            gains.append(diff)
-            losses.append(0)
-        else:
-            gains.append(0)
-            losses.append(abs(diff))
-            
+        deltas.append(prices[i] - prices[i-1])
+        
+    # 2. Поділяємо на прибутки та збитки
+    gains = [d if d > 0 else 0 for d in deltas]
+    losses = [abs(d) if d < 0 else 0 for d in deltas]
+    
+    # 3. Перше середнє значення — це просте середнє (SMA) за перший період
     avg_gain = sum(gains[:period]) / period
     avg_loss = sum(losses[:period]) / period
     
+    # 4. Всі наступні значення рахуємо за методом згладжування Вайлдера (Wilder's Smoothing)
+    # Формула: Alpha = 1 / period
+    # NewAvg = PrevAvg * (1 - Alpha) + CurrentValue * Alpha
+    # Що еквівалентно: NewAvg = (PrevAvg * (period - 1) + CurrentValue) / period
     for i in range(period, len(gains)):
         avg_gain = (avg_gain * (period - 1) + gains[i]) / period
         avg_loss = (avg_loss * (period - 1) + losses[i]) / period

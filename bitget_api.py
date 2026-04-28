@@ -35,9 +35,18 @@ async def get_bitget_data(session, symbol, granularity="5m"):
                 candles_data = await response.json()
                 if 'data' in candles_data and candles_data['data']:
                     candles = candles_data['data']
+                    # У Bitget API v2 свічки повертаються як масив масивів:
+                    # [ts, open, high, low, close, vol, quoteVol]
+                    # Закриття — це індекс 4. Свічки йдуть від нових до старих.
                     close_prices = [float(c[4]) for c in candles]
+                    
+                    # Розвертаємо, щоб було від старих до нових
                     close_prices.reverse()
-                    close_prices.append(current_price)
+                    
+                    # ВАЖЛИВО: Останній елемент у candles[0] — це вже поточна ціна 
+                    # (свічка, що ще формується). Додатково append(current_price) робити НЕ треба,
+                    # бо це призведе до дублювання останньої точки і некоректного RSI.
+                    
                     rsi_val = calculate_rsi(close_prices, period=14)
                 else:
                     logger.warning(f"Candles API повернув порожні дані для {symbol}")
