@@ -1,8 +1,9 @@
 import logging
+from logging.handlers import RotatingFileHandler
 
 def setup_logger():
     """
-    Налаштовує логування: чистий текст у файл та мінімалістичний вивід у консоль.
+    Налаштовує логування: ротація логів, чистий текст у файл та мінімалістичний вивід у консоль.
     """
     # Створюємо логер
     logger = logging.getLogger("Nexus")
@@ -12,9 +13,9 @@ def setup_logger():
     if logger.hasHandlers():
         logger.handlers.clear()
 
-    # 1. Налаштування запису у файл (без кольорів, тільки текст)
+    # 1. Налаштування запису у файл з ротацією (макс. 5МБ, зберігаємо 3 останні файли)
     file_formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    file_handler = logging.FileHandler("nexus.log", encoding="utf-8")
+    file_handler = RotatingFileHandler("nexus.log", maxBytes=5*1024*1024, backupCount=3, encoding="utf-8")
     file_handler.setFormatter(file_formatter)
     
     # 2. Налаштування виводу в консоль (максимально коротко)

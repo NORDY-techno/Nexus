@@ -49,18 +49,25 @@ async def get_all_rsi_data(symbols, granularity="5m"):
         logger.error(f"Помилка пакетного отримання RSI: {e}")
         return {s: None for s in symbols}
 
-async def get_bitget_price(session, symbol):
+async def get_bitget_price(session, symbol, retries=3):
     """
-    Отримує тільки поточну ціну через Bitget API.
+    Отримує тільки поточну ціну через Bitget API з повторними спробами.
     """
-    try:
-        ticker_url = f"https://api.bitget.com/api/v2/spot/market/tickers?symbol={symbol}"
-        async with session.get(ticker_url, timeout=10) as response:
-            if response.status == 200:
-                ticker_data = await response.json()
-                if 'data' in ticker_data and ticker_data['data']:
-                    return float(ticker_data['data'][0]['lastPr'])
-        return None
-    except Exception as e:
-        logger.error(f"Помилка отримання ціни ({symbol}): {e}")
-        return None
+    ticker_url = f"https://api.bitget.com/api/v2/spot/market/tickers?symbol={symbol}"
+    for attempt in range(retries):
+        try:
+            async with session.get(ticker_url, timeout=10) as response:
+                if response.status == 200:
+                    ticker_data = await response.json()
+                    if 'data' in ticker_data and ticker_data['data']:
+                        return float(ticker_data['data'][0]['lastPr'])
+                elif response.status == 429:
+                    logger.warning(f"Rate limit hit for {symbol}, retrying...")
+                    await asyncio.sleep(1)
+                else:
+                    logger.error(f"Помилка Ticker API ({symbol}): статус {response.status}")
+        except Exception as e:
+            if attempt == retries - 1:
+                logger.error(f"Критична помилка отримання ціни ({symbol}) після {retries} спроб: {e}")
+            await asyncio.sleep(0.5)
+    return None
