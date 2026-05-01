@@ -1,18 +1,21 @@
-import sys
-import asyncio
+def get_rsi_emoji(rsi):
+    """
+    Повертає емодзі залежно від значення RSI.
+    """
+    if rsi is None:
+        return "⚪"
+    if rsi > 70:
+        return "🟢"
+    if rsi < 30:
+        return "🔵"
+    return "⚪"
 
-async def async_animate_wait(seconds):
+def get_change_info(change, threshold):
     """
-    Асинхронна функція для анімованого очікування.
+    Повертає колір, знак та емодзі залежно від зміни ціни.
     """
-    symbols = ["|", "/", "-", "\\"]
-    iterations = int(seconds / 0.1)
-    
-    for i in range(iterations):
-        symbol = symbols[i % 4]
-        sys.stdout.write(f"\rОчікування... [{symbol}]")
-        sys.stdout.flush()
-        await asyncio.sleep(0.1)
-    
-    sys.stdout.write("\r" + " " * 25 + "\r")
-    sys.stdout.flush()
+    if change >= threshold:
+        return "\033[92m", "+", "📈"  # GREEN
+    elif change <= -threshold:
+        return "\033[91m", "", "📉"   # RED
+    return "", "", "📊"              # RESET / GRAY
