@@ -1,61 +1,69 @@
-# The Guardian - Crypto Price Tracker (Nexus)
+# Nexus: Multi-Asset Guardian
 
-Професійний скрипт на Python для відстеження ціни криптовалюти у реальному часі через **Bitget API**. Проект має модульну структуру, високу стійкість до збоїв та вбудований технічний аналіз.
+Nexus is a high-performance, asynchronous monitoring tool for cryptocurrency assets. It tracks real-time prices via Bitget API and technical indicators (RSI) via TradingView, providing instant updates through a Telegram bot and a clean terminal interface.
 
-## Функції
-- 📈 **Мульти-моніторинг**: Одночасне відстеження **10 криптовалютних пар** (BTC, ETH, SOL, BNB тощо).
-- 📊 **Технічний аналіз**: Моніторинг індикатора **RSI(14)** для кожного активу на таймфреймі **M5**.
-- 📲 **Telegram Сповіщення**: Персоналізовані повідомлення про зміну ціни для кожного активу.
-- 🎨 **Кольорова індикація**: 
-  - **Зелений**: зміна ≥ +0.1%
-  - **Червоний**: зміна ≤ -0.1%
-  - **Білий**: незначні коливання (< 0.1%)
-- 🌀 **Анімоване очікування**: Динамічний спінер `[| / - \]` під час паузи між запитами.
-- 🛡️ **Стійкість до помилок**: Якщо біржа Bitget не відповідає, скрипт чекає 5 секунд і пробує знову.
-- 📝 **Логування**: Чистий запис подій у файл `nexus.log` без зайвих символів.
+## Key Features
 
-## Структура проекту
-- `main.py` — основний цикл програми.
-- `bitget_api.py` — модуль для взаємодії з API Bitget.
-- `telegram_bot.py` — модуль для роботи з Telegram API.
-- `utils.py` — математичні розрахунки (RSI) та анімація.
-- `logger.py` — налаштування системи логування.
-- `nexus.log` — історія цін та технічних показників.
+- **Asynchronous Execution**: Powered by `asyncio` and `aiohttp` for simultaneous multi-asset monitoring without delays.
+- **Accurate Indicators**: Integrated with `tradingview-ta` to fetch 100% accurate RSI values directly from TradingView servers.
+- **Bulk Data Fetching**: Optimized API requests (bulk fetching) to avoid rate limiting (HTTP 429).
+- **Telegram Integration**: Instant notifications for significant price changes and RSI levels.
+- **Modular Architecture**: Clean separation between API logic, configuration, and utilities.
+- **Advanced Logging**: Centralized logging with automatic file rotation (max 5MB).
 
-## Налаштування Telegram
-Щоб отримувати сповіщення безпечно:
-1. Створіть файл `.env` у корені проекту.
-2. Додайте туди ваші дані:
-   ```env
-   TELEGRAM_TOKEN=ваш_токен
-   TELEGRAM_CHAT_ID=ваш_айді
-   ```
-3. Встановіть бібліотеку для роботи з оточенням:
-   ```bash
-   pip install python-dotenv
-   ```
-4. Секретні дані автоматично ігноруються Git завдяки `.gitignore`.
+## Visual Indicators
 
-## Вимоги
-- Python 3.8+
-- `aiohttp` (для асинхронних запитів)
-- `python-dotenv` (для роботи з .env)
+### Price Change
+- 📈 **Price Up**: Significant upward movement (default threshold: 0.1%).
+- 📉 **Price Down**: Significant downward movement.
+- � **Flat**: Minor price fluctuations.
 
-## Встановлення
-1. Клонуйте репозиторій:
+### RSI Levels
+- 🟢 **Overbought**: RSI > 70.
+- � **Oversold**: RSI < 30.
+- ⚪ **Neutral**: RSI between 30 and 70.
+
+## Installation
+
+1. **Clone the repository**:
    ```bash
    git clone https://github.com/NORDY-techno/Nexus.git
    cd Nexus
    ```
-2. Встановіть залежності:
-   ```bash
-pip install aiohttp python-dotenv tradingview-ta
-```
 
-## Запуск
+2. **Install dependencies**:
+   ```bash
+   pip install aiohttp python-dotenv tradingview-ta
+   ```
+
+3. **Configure environment variables**:
+   Create a `.env` file in the root directory:
+   ```env
+   TELEGRAM_TOKEN=your_bot_token
+   TELEGRAM_CHAT_ID=your_chat_id
+   ```
+
+## Configuration
+
+Modify `config.py` to customize:
+- `SYMBOLS`: List of assets to monitor (e.g., `BTCUSDT`, `ETHUSDT`).
+- `GRANULARITY`: Timeframe for analysis (`1m`, `5m`, `15m`, `1h`).
+- `COLOR_THRESHOLD`: Threshold for terminal color highlights.
+- `TG_THRESHOLD`: Threshold for Telegram push notifications.
+
+## Usage
+
+Start the guardian:
 ```bash
 python main.py
 ```
 
-## Ліцензія
-GNU GENERAL PUBLIC LICENSE Version 3
+## Security
+
+- Sensitive data is stored in `.env`.
+- Project rules for AI assistants are managed via `.traerules`.
+- Both `.env` and `.traerules` are ignored by Git via `.gitignore`.
+
+## License
+
+MIT License. See `LICENSE` for details.
