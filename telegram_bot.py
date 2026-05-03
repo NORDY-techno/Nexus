@@ -1,41 +1,15 @@
-import aiohttp
-import logging
-import os
+import logging, os
 from dotenv import load_dotenv
 
-# Завантажуємо змінні з .env файлу
 load_dotenv()
-
-# Отримуємо логер
 logger = logging.getLogger("Nexus")
+TOKEN, CHAT_ID = os.getenv("TELEGRAM_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
 
-# Конфігурація Telegram
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
-async def send_telegram_msg(session, message):
-    """
-    Асинхронно відправляє повідомлення у Telegram бот.
-    """
-    if not TOKEN or not CHAT_ID or "YOUR_BOT_TOKEN" in TOKEN:
-        return False
-        
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": message,
-        "parse_mode": "HTML"
-    }
-    
+async def send_telegram_msg(session, text):
+    if not TOKEN or not CHAT_ID or "YOUR_BOT_TOKEN" in TOKEN: return False
     try:
-        async with session.post(url, json=payload, timeout=10) as response:
-            if response.status == 200:
-                logger.debug("Telegram message sent successfully")
-                return True
-            else:
-                resp_text = await response.text()
-                logger.error(f"Telegram Error: {response.status} - {resp_text}")
-                return False
-    except Exception as e:
-        logger.error(f"Telegram Exception: {e}")
-        return False
+        async with session.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}, timeout=10) as resp:
+            if resp.status == 200: return True
+            logger.error(f"TG Error: {resp.status} - {await resp.text()}")
+    except Exception as e: logger.error(f"TG Exception: {e}")
+    return False

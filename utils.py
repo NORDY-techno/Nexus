@@ -1,35 +1,12 @@
 def get_rsi_emoji(rsi):
-    """
-    Повертає емодзі залежно від значення RSI.
-    """
-    if rsi is None:
-        return "⚪"
-    if rsi > 70:
-        return "🟢"
-    if rsi < 30:
-        return "🔵"
-    return "⚪"
+    if rsi is None: return "⚪"
+    return "🟢" if rsi > 70 else "🔵" if rsi < 30 else "⚪"
 
 def get_change_info(change, threshold):
-    """
-    Повертає колір, знак та емодзі залежно від зміни ціни.
-    """
-    if change >= threshold:
-        return "\033[92m", "+", "📈"  # GREEN
-    elif change <= -threshold:
-        return "\033[91m", "", "📉"   # RED
-    return "", "", "📊"              # RESET / GRAY
+    if change >= threshold: return "\033[92m", "+", "📈"
+    if change <= -threshold: return "\033[91m", "", "📉"
+    return "", "", "📊"
 
-def get_volume_emoji(vol_change):
-    """
-    Повертає емодзі залежно від зміни об'єму.
-    """
-    if vol_change is None:
-        return "⚪"
-    if vol_change >= 100:
-        return "🔥"
-    if vol_change > 0:
-        return "⬆️"
-    if vol_change < 0:
-        return "⬇️"
-    return "⚪"
+def get_volume_emoji(vol):
+    if vol is None: return "⚪"
+    return "🔥" if vol >= 100 else "⬆️" if vol > 0 else "⬇️" if vol < 0 else "⚪"

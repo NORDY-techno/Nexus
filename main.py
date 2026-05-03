@@ -1,119 +1,71 @@
-import asyncio
-import aiohttp
-import sys
-import time
-import ccxt.async_support as ccxt
-from bitget_api import get_all_rsi_data, get_bitget_price, get_bitget_volume_data
+import asyncio, aiohttp, sys, time, ccxt.async_support as ccxt
+from bitget_api import get_all_bitget_prices
+from indicators import get_all_rsi_data
+from volume_analyzer import get_bitget_volume_data
 from logger import setup_logger
 from telegram_bot import send_telegram_msg
 from utils import get_rsi_emoji, get_change_info, get_volume_emoji
 import config
 
-# Ініціалізація логера
-logger = setup_logger()
+logger, last_prices = setup_logger(), {}
 
-# Словник для збереження останніх цін кожного активу
-last_prices = {}
-
-async def process_symbol(session, exchange, symbol, rsi):
-    """
-    Обробка одного активу: запит ціни, розрахунок зміни та відправка сповіщень.
-    """
+async def process_symbol(session, exchange, symbol, rsi, price):
     global last_prices
     try:
-        # Отримуємо ціну та об'єм паралельно
-        price_task = get_bitget_price(session, symbol)
-        vol_task = get_bitget_volume_data(exchange, symbol, config.GRANULARITY)
-        
-        price, vol_change = await asyncio.gather(price_task, vol_task)
-        
-        if price is None:
-            return
+        vol_change = await get_bitget_volume_data(exchange, symbol, config.GRANULARITY)
+        if price is None: return
 
-        rsi_emoji = get_rsi_emoji(rsi)
-        rsi_text = f" | {rsi_emoji} RSI: {rsi:.1f}" if rsi is not None else ""
+        rsi_txt = f" | {get_rsi_emoji(rsi)} RSI: {rsi:.1f}" if rsi is not None else ""
+        vol_txt = f" | {get_volume_emoji(vol_change)} Vol: {vol_change:+.1f}%" if vol_change is not None else ""
         
-        vol_emoji = get_volume_emoji(vol_change)
-        vol_text = f" | {vol_emoji} Vol: {vol_change:+.1f}%" if vol_change is not None else ""
-        
-        if symbol in last_prices and last_prices[symbol] is not None:
-            old_price = last_prices[symbol]
-            change = ((price - old_price) / old_price) * 100
+        if symbol in last_prices:
+            old = last_prices[symbol]
+            change = (price - old) / old * 100
+            color, sign, p_emoji = get_change_info(change, config.COLOR_THRESHOLD)
+            msg = f"{symbol}: {price} USDT | {sign}{change:.2f}%{rsi_txt}{vol_txt}"
+            sys.stdout.write(f"[{time.strftime('%H:%M:%S')}] {color}{msg}\033[0m\n")
+            logger.info(f"DATA: {msg}")
             
-            color, sign, price_emoji = get_change_info(change, config.COLOR_THRESHOLD)
-            clean_msg = f"{symbol}: {price} USDT | {sign}{change:.2f}%{rsi_text}{vol_text}"
+            # Умова: значна зміна ціни АБО сплеск об'єму (лише ріст >= 100%)
+            price_moved = abs(change) >= config.TG_THRESHOLD
+            vol_spiked = vol_change is not None and vol_change >= 100.0
             
-            # Вивід у консоль та лог
-            sys.stdout.write(f"[{time.strftime('%H:%M:%S')}] {color}{clean_msg}\033[0m\n")
-            logger.info(f"DATA: {clean_msg}")
-            
-            # Відправка в Telegram
-            if abs(change) >= config.TG_THRESHOLD:
-                rsi_val_str = f"{rsi:.1f}" if rsi is not None else "N/A"
-                vol_val_str = f"{vol_change:+.1f}%" if vol_change is not None else "N/A"
-                tg_msg = (
-                    f"{price_emoji} <b>{symbol}</b>\n"
-                    f"Price: {price} USDT\n"
-                    f"Change: {sign}{change:.2f}%\n"
-                    f"{rsi_emoji} RSI: {rsi_val_str}\n"
-                    f"{vol_emoji} Volume: {vol_val_str}"
-                )
+            if price_moved or vol_spiked:
+                hdr = f"{p_emoji} <b>{symbol}</b>"
+                if vol_spiked and not price_moved:
+                    hdr = f"🔥 <b>{symbol} (Vol Spike)</b>"
+                
+                v_val = f"{vol_change:+.1f}%" if vol_change is not None else "N/A"
+                r_val = f"{rsi:.1f}" if rsi is not None else "N/A"
+                tg_msg = f"{hdr}\n💰 Price: <code>{price}</code> USDT\n📈 Change: <b>{sign}{change:.2f}%</b>\n{get_rsi_emoji(rsi)} RSI: <code>{r_val}</code>\n{get_volume_emoji(vol_change)} Volume: <b>{v_val}</b>"
                 await send_telegram_msg(session, tg_msg)
         else:
-            # Перший запуск
-            msg = f"{symbol}: {price} USDT {rsi_text}{vol_text} (ініціалізація)"
+            msg = f"{symbol}: {price} USDT{rsi_txt}{vol_txt} (initialization)"
             sys.stdout.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
             logger.info(msg)
-        
         last_prices[symbol] = price
-    except Exception as e:
-        logger.error(f"Error processing {symbol}: {e}")
+    except Exception as e: logger.error(f"Error {symbol}: {e}")
 
 async def run_cycle(session, exchange):
-    """
-    Один цикл опитування всіх активів.
-    """
-    rsi_data = await get_all_rsi_data(config.SYMBOLS, config.GRANULARITY)
-    tasks = [process_symbol(session, exchange, symbol, rsi_data.get(symbol)) for symbol in config.SYMBOLS]
-    await asyncio.gather(*tasks)
+    symbols = list(set(config.SYMBOLS))
+    rsi_data, price_data = await asyncio.gather(get_all_rsi_data(symbols, config.GRANULARITY), get_all_bitget_prices(session, symbols))
+    await asyncio.gather(*[process_symbol(session, exchange, s, rsi_data.get(s), price_data.get(s)) for s in symbols])
 
 async def main():
-    logger.info(f"Nexus Active | {len(config.SYMBOLS)} assets | {config.GRANULARITY}")
-    
-    # Створюємо сесії
+    logger.info(f"Nexus Active | {len(config.SYMBOLS)} assets")
     async with aiohttp.ClientSession() as session:
-        exchange = ccxt.bitget()
+        ex = ccxt.bitget({'enableRateLimit': True, 'options': {'defaultType': 'spot'}})
         try:
-            # Початкове сповіщення
-            await send_telegram_msg(session, f"🚀 <b>Nexus Active</b>\nMonitoring: {len(config.SYMBOLS)} assets\nTimeframe: {config.GRANULARITY}")
-            
-            # Словник інтервалів у секундах
-            intervals = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600}
-            interval = intervals.get(config.GRANULARITY, 300)
-
+            await send_telegram_msg(session, f"🚀 <b>Nexus Active</b>\nMonitoring: {len(config.SYMBOLS)} assets")
+            interval = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600}.get(config.GRANULARITY, 300)
             while True:
-                try:
-                    await run_cycle(session, exchange)
-                    
-                    # Рахуємо час до наступної свічки
-                    passed = time.time() % interval
-                    wait_time = interval - passed + config.UPDATE_DELAY
-                    
-                    next_run = time.strftime('%H:%M:%S', time.localtime(time.time() + wait_time))
-                    sys.stdout.write(f"[*] Наступний запит о {next_run}\n")
-                    
-                    await asyncio.sleep(wait_time)
-                except Exception as e:
-                    logger.error(f"Cycle Error: {e}. Reconnecting in 10s...")
-                    await asyncio.sleep(10)
-        finally:
-            await exchange.close()
+                await run_cycle(session, ex)
+                wait = interval - (time.time() % interval) + config.UPDATE_DELAY
+                sys.stdout.write(f"[*] Next run: {time.strftime('%H:%M:%S', time.localtime(time.time() + wait))}\n")
+                await asyncio.sleep(wait)
+        finally: await ex.close()
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Nexus stopped by user")
-    except Exception as e:
-        logger.critical(f"Fatal Error: {e}")
-        sys.exit(1)
+    try: asyncio.run(main())
+    except KeyboardInterrupt: logger.info("Stopped")
+    except Exception as e: logger.critical(f"Fatal: {e}"); sys.exit(1)
