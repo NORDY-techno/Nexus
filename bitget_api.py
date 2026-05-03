@@ -1,6 +1,6 @@
-import aiohttp
 import asyncio
 import logging
+import ccxt.async_support as ccxt
 from tradingview_ta import Interval, get_multiple_analysis
 
 # Отримуємо існуючий логер
@@ -65,3 +65,29 @@ async def get_bitget_price(session, symbol, retries=3):
                 logger.error(f"Критична помилка ціни ({symbol}) після {retries} спроб: {e}")
             await asyncio.sleep(0.5)
     return None
+
+async def get_bitget_volume_data(exchange, symbol, timeframe='5m'):
+    """
+    Отримує зміну об'єму для останньої закритої свічки.
+    Формула: ((current - prev) / prev) * 100
+    """
+    try:
+        # Отримуємо останні 2 свічки (0: попередня, 1: поточна незакрита)
+        # Нам потрібні саме 2 останні закриті свічки для точного аналізу, 
+        # або поточна vs попередня як просив юзер.
+        # Формула користувача: ((current - prev) / prev) * 100
+        ohlcv = await exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=2)
+        if len(ohlcv) < 2:
+            return None
+            
+        prev_vol = ohlcv[0][5]  # Volume is at index 5
+        curr_vol = ohlcv[1][5]
+        
+        if prev_vol == 0:
+            return 0.0
+            
+        vol_change = ((curr_vol - prev_vol) / prev_vol) * 100
+        return vol_change
+    except Exception as e:
+        logger.error(f"Помилка отримання об'єму для {symbol}: {e}")
+        return None

@@ -19,3 +19,17 @@ def get_change_info(change, threshold):
     elif change <= -threshold:
         return "\033[91m", "", "📉"   # RED
     return "", "", "📊"              # RESET / GRAY
+
+def get_volume_emoji(vol_change):
+    """
+    Повертає емодзі залежно від зміни об'єму.
+    """
+    if vol_change is None:
+        return "⚪"
+    if vol_change >= 100:
+        return "🔥"
+    if vol_change > 0:
+        return "⬆️"
+    if vol_change < 0:
+        return "⬇️"
+    return "⚪"
