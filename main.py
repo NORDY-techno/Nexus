@@ -23,31 +23,44 @@ async def process_ticker(symbol, price, session, spot_ex, swap_ex):
         
         rsi_txt = f" | {get_rsi_emoji(rsi)} RSI: {rsi:.1f}" if rsi is not None else ""
         vol_txt = f" | {get_volume_emoji(vol_change)} Vol: {vol_change:+.1f}%" if vol_change is not None else ""
-        oi_log = f" | 🔍 OI: {oi_data['oi_change']:+.2f}%" if oi_data else ""
+        oi_val = oi_data['oi_change'] if oi_data else None
+        oi_log = f" | 🔍 OI: {oi_val:+.2f}%" if oi_val is not None else ""
 
         if symbol in last_prices:
             old = last_prices[symbol]
             change = (price - old) / old * 100
             
-            # Вивід у консоль тільки при значній зміні ціни (> порогу), щоб не спамити кожну мс
             if abs(change) >= config.COLOR_THRESHOLD:
                 color, sign, p_emoji = get_change_info(change, config.COLOR_THRESHOLD)
                 msg = f"{symbol}: {price} USDT | {sign}{change:.2f}%{rsi_txt}{vol_txt}{oi_log}"
                 sys.stdout.write(f"[{time.strftime('%H:%M:%S')}] {color}{msg}\033[0m\n")
                 
-                if abs(change) >= config.TG_THRESHOLD or (vol_change is not None and vol_change >= 100.0) or oi_data:
+                # Умови відправки: ціна, об'єм або статус OI
+                oi_spiked = oi_data and oi_data.get('status')
+                if abs(change) >= config.TG_THRESHOLD or (vol_change is not None and vol_change >= 100.0) or oi_spiked:
                     hdr = f"{p_emoji} <b>{symbol}</b>"
-                    if oi_data: hdr = f"📊 <b>{symbol} (OI Alert)</b>"
+                    if oi_spiked: hdr = f"📊 <b>{symbol} (OI Alert)</b>"
                     elif vol_change and vol_change >= 100.0 and abs(change) < config.TG_THRESHOLD: 
                         hdr = f"🔥 <b>{symbol} (Vol Spike)</b>"
                     
                     v_val = f"{vol_change:+.1f}%" if vol_change is not None else "N/A"
                     r_val = f"{rsi:.1f}" if rsi is not None else "N/A"
-                    oi_txt = f"\n🔍 OI: <b>{oi_data['status']}</b> (OI: {oi_data['oi_change']:+.2f}%)" if oi_data else ""
+                    o_val = f"{oi_val:+.2f}%" if oi_val is not None else "N/A"
                     
-                    tg_msg = f"{hdr}\n💰 Price: <code>{price}</code> USDT\n📈 Change: <b>{sign}{change:.2f}%</b>\n{get_rsi_emoji(rsi)} RSI: <code>{r_val}</code>\n{get_volume_emoji(vol_change)} Volume: <b>{v_val}</b>{oi_txt}"
+                    # Статус OI (якщо є аномалія)
+                    oi_status_txt = f"\n🔍 OI Status: <b>{oi_data['status']}</b>" if oi_spiked else ""
+                    
+                    tg_msg = (
+                        f"{hdr}\n"
+                        f"💰 Price: <code>{price}</code> USDT\n"
+                        f"📈 Change: <b>{sign}{change:.2f}%</b> ({config.GRANULARITY})\n"
+                        f"{get_rsi_emoji(rsi)} RSI: <code>{r_val}</code>\n"
+                        f"{get_volume_emoji(vol_change)} Volume: <b>{v_val}</b>\n"
+                        f"🔍 Open Interest: <b>{o_val}</b>"
+                        f"{oi_status_txt}"
+                    )
                     await send_telegram_msg(session, tg_msg)
-                    last_prices[symbol] = price # Оновлюємо ціну тільки після відправки пуша або великої зміни
+                    last_prices[symbol] = price
         else:
             last_prices[symbol] = price
             logger.info(f"Initialized {symbol}: {price} USDT")
@@ -79,12 +92,16 @@ async def update_heavy_indicators(session, spot_ex, swap_ex):
                     
                     current_volumes[s] = vol_change
                     current_oi[s] = oi_data
+                    last_prices[s] = p  # Синхронізуємо ціну кожні 5хв
             
-            logger.info(f"Heavy indicators updated for {len(symbols)} assets")
+            logger.info(f"Heavy indicators updated | TF: {config.GRANULARITY}")
             
-            # Чекаємо до наступного закриття свічки або заданий інтервал
+            # Точна синхронізація з закриттям свічки (наприклад, 10:00, 10:05, 10:10)
             interval = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600}.get(config.GRANULARITY, 300)
-            await asyncio.sleep(interval)
+            wait_time = interval - (time.time() % interval) + config.UPDATE_DELAY
+            
+            logger.info(f"Next indicators update in {int(wait_time)}s")
+            await asyncio.sleep(wait_time)
         except Exception as e:
             logger.error(f"Error updating heavy indicators: {e}")
             await asyncio.sleep(10)
